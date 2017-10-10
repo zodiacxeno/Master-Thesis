@@ -2,6 +2,8 @@ import numpy as np
 from collections import namedtuple
 import copy
 import matplotlib.pyplot as plt
+import multiprocessing
+import matplotlib.lines as mlines
 
 class gridWorld:
     def __init__(self, grid):
@@ -179,151 +181,9 @@ class gridWorld:
 
         return State(next_state), rewards[next_state], done
 
-def valueIterationAlgo(env,discount_factor=0.7,theta=0.0001):
-    V=np.zeros(env.states.size)
-    P=env.transitionFunc()
-    policy=np.zeros([env.states.size,env.actions.size])
-    V_trend=[]
-    while True:
-        delta = 0
-        for s in env.states:
-            action_values = np.zeros(env.actions.size)
-            for a, actions in enumerate(env.actions):
-                for prob,next_state,reward,done in P[s,a]:
-                    action_values[a]+=prob*(reward+discount_factor*V[next_state])
-
-            V_new=max(action_values)
-            policy[s]=np.eye(env.actions.size)[np.argmax(action_values)]
-            delta=max(delta,np.abs(V_new-V[s]))
-            V[s]=V_new
-        V_trend.append(sum(V))
-        print V.reshape(grid.shape)
-        if delta<theta:
-           return policy, V_trend, V
-           break
 
 
-def monteCarloPredictor(env, policy, epsilon, num_episodes, discount_factor=1.0):
-    Q = dict(policy)
-    returns_value = dict(policy)
-    returns_count = dict(policy)
-    V={}
-    V_trend=[]
-    for key in policy:
-        Q[key] = [0] * env.actions.size
-        returns_value[key] = [0] * env.actions.size
-        returns_count[key] = [0] * env.actions.size
-
-    for i in range(0, num_episodes):
-        env.reset()
-        state = env.initializeState()
-        # print env.grid
-        episode = []
-        print ("Episode: {0}".format(i))
-        # print "--------------------------------------Start of Episode ----------------------------------------------"
-        for t in range(100):
-            action = np.random.choice([k for k in range(4)], p=policy[state])
-            # print state, env.actions[action]
-            next_state, reward, done = env.executeAction(state, action)
-            # print next_state
-            episode.append((state, action, reward))
-            # print env.grid
-            if done:
-                break
-            state = next_state
-
-
-
-        # Version 1: Only first state,action pair in episode is considered for updating the Q-value table
-        states_in_episode = set([episode[0][0]])
-        G = sum(x[2] * discount_factor ** i for i, x in enumerate(episode[0:]))
-        returns_value[episode[0][0]][episode[0][1]] += G
-        returns_count[episode[0][0]][episode[0][1]] += 1
-        Q[episode[0][0]][episode[0][1]] = returns_value[episode[0][0]][episode[0][1]] / returns_count[episode[0][0]][episode[0][1]]
-
-
-
-        # Version 2: Subsequent episodes are considered but with first-visit states
-        # states_in_episode = set([(x[0]) for x in episode])
-        # for state in states_in_episode:
-        #     first_occurrence_id = next(i for i, x in enumerate(episode) if x[0] == state)
-        #     G = sum(x[2]*discount_factor**i for i, x in enumerate(episode[first_occurrence_id:]))
-        #     returns_value[state][episode[first_occurrence_id][1]] += G
-        #     returns_count[state][episode[first_occurrence_id][1]] += 1
-        #     Q[state][episode[first_occurrence_id][1]] = returns_value[state][episode[first_occurrence_id][1]]/returns_count[state][episode[first_occurrence_id][1]]
-        # # #     # print Q[state]
-        #
-        for state in states_in_episode:
-            epsilon_greedy_prob = (np.eye(env.actions.size)[np.argmax(Q[state])]*(1-epsilon))+(epsilon/env.actions.size)
-            policy[state] = epsilon_greedy_prob
-
-        for state, Q_values in Q.items():
-            V[state]=sum([Q_values[val]*policy[state][val] for val in range(len(Q_values))])
-
-        V_trend.append(sum(V.values()))
-
-
-        # print "--------------------------------------- End of Episode -------------------------------------------------"
-
-
-    return policy,V_trend, V
-
-def comparePolicies(env,policy1,policy2):
-    grid_policy_mc = np.zeros(policy1.__len__(), dtype='S8')
-    grid_policy_val = np.zeros(policy2.__len__(), dtype='S8')
-    for i in range(16):
-        if np.argmax(policy1[State(i)]) == np.argmax(policy2[i]):
-            print True
-        else:
-            print False
-
-        grid_policy_mc[i] = env.actions[np.argmax(policy1[State(i)])]
-
-        grid_policy_val[i] = env.actions[np.argmax(policy2[i])]
-
-
-    print "Monte Carlo: "
-    print np.reshape(grid_policy_mc,env.grid.shape)
-    print "Value Iteration:"
-    print np.reshape(grid_policy_val, env.grid.shape)
-
-
-def plotTrend(algorithm,subplot):
-    policy, V_trend, V = algorithm
-    print policy
-    plt.figure(1)
-    plt.subplot(subplot)
-    plt.plot(V_trend)
-    plt.ylabel('V values')
-    plt.xlabel('Iteration Number')
-
-
-def testAlgoParam():
-    num_iters = np.linspace(1000, 50000, 50)
-    epsilon = np.linspace(0.0, 1.0, 10)
-    V_trend = []
-    for num in num_iters:
-        _, _, V = monteCarloPredictor(env, policy, 0.1, int(num))
-        V_trend.append(V)
-
-    plt.figure(1)
-    plt.subplot(121).set_title("Iteration Performance")
-    plt.xlabel('Number of Iterations')
-    plt.ylabel('V Value')
-    plt.plot(V)
-
-    for eps in epsilon:
-        _, _, V = monteCarloPredictor(env, policy, eps, 10000)
-        V_trend.append(V)
-
-    plt.figure(1)
-    plt.subplot(122).set_title("Exploration Performance")
-    plt.xlabel('Epsilon')
-    plt.ylabel('V Value')
-    plt.plot(V)
-
-    plt.show()
-
+# Main Program Area
 grid = np.array([['o', 'o', 'o', '*'],
                  ['#', '#', 'o', '#'],
                  ['o', 'o', 'o', 'o'],
@@ -335,15 +195,6 @@ State=namedtuple("State", ["static_location"])
 policy={}
 for i in range(grid.size):
     policy[State(i)] = [0.25, 0.25, 0.25, 0.25]
-
-# policy_mc, _ = monteCarloPredictor(env, policy, 0.1, 100)
-plotTrend(monteCarloPredictor(env, policy, 0.1, 1000),subplot=121)
-plotTrend(valueIterationAlgo(env), subplot=122)
-plt.show()
-testAlgoParam()
-
-
-
 
 
 
