@@ -1,5 +1,7 @@
 import numpy as np
+from collections import namedtuple
 
+State=namedtuple("State", ["static_location", "dynamic_location"])
 def valueIterationAlgo(env, discount_factor=0.7, theta=0.0001):
     V=np.zeros(env.states.size)
     P=env.transitionFunc()
@@ -30,12 +32,14 @@ def monteCarloPredictor(env, policy, epsilon, num_episodes, discount_factor=1.0)
     returns_count = dict(policy)
     V={}
     V_trend=[]
+    V_episodic_trend = []
     for key in policy:
         Q[key] = [0] * env.actions.size
         returns_value[key] = [0] * env.actions.size
         returns_count[key] = [0] * env.actions.size
 
     for i in range(0, num_episodes):
+        track_episode = iter(np.linspace(0, num_episodes, 10))
         env.reset()
         state = env.initializeState()
         episode = []
@@ -84,11 +88,110 @@ def monteCarloPredictor(env, policy, epsilon, num_episodes, discount_factor=1.0)
             V[state]=sum([Q_values[val]*policy[state][val] for val in range(len(Q_values))])
 
         V_trend.append(sum(V.values()))
-
+        if i == next(track_episode):
+            V_episodic_trend.append(sum(V.values))
 
         print "--------------------------------------- End of Episode -------------------------------------------------"
 
 
-    return policy,V_trend, sum(V.values())
+    return policy,V_trend, V_episodic_trend
 
 
+def sarsaTD(env, policy, epsilon, num_episodes, step_rate=0.1, discount_factor=0.9):
+    Q = dict(policy)
+    V = {}
+    V_trend = []
+    V_episodic_trend = []
+    sample_state = 12
+
+    for key in policy:
+        Q[key] = [0] * env.actions.size
+
+    for i in range(0, num_episodes):
+
+        env.reset()
+        state = env.initializeState()
+
+        print ("Episode: {0}".format(i))
+        # print "--------------------------------------Start of Episode ----------------------------------------------"
+        current_state_action = np.random.choice([k for k in range(env.actions.size)], p=policy[state])
+        for t in range(100):
+            # print "--------------------------------------Step {0} ----------------------------------------------" .format(t)
+            # if i>num_episodes-50:
+            #     print env.grid, env.actions[current_state_action]
+            # print state, env.actions[action]
+            next_state, reward, done = env.executeAction(state, current_state_action)
+            epsilon_greedy_prob = (np.eye(env.actions.size)[np.argmax(Q[next_state])] * (1 - epsilon)) + (epsilon / env.actions.size)
+            next_state_action = np.random.choice([k for k in range(env.actions.size)], p=epsilon_greedy_prob)
+            # next_state_action = np.argmax(Q[next_state])
+            Q[state][current_state_action] += step_rate*(reward+(discount_factor*Q[next_state][next_state_action]) - Q[state][current_state_action])
+            if state == State(11,9):
+                print Q[state]
+            if done:
+                break
+            state = next_state
+            current_state_action = next_state_action
+
+        for state, Q_values in Q.items():
+            policy[state] = (np.eye(env.actions.size)[np.argmax(Q_values)] * (1 - epsilon)) + (epsilon / env.actions.size)
+            V[state] = sum([Q_values[val] * policy[state][val] for val in range(len(Q_values))])
+
+        V_trend.append(sum(V.values()))
+
+        if i == 0:
+            V_episodic_trend.append(sum(V.values()[sample_state * 16:(sample_state * 16) + 16]))
+
+        elif (i+1) % (num_episodes/10) == 0:
+            V_episodic_trend.append(sum(V.values()[sample_state*16:(sample_state*16)+16]))
+
+        # print "--------------------------------------- End of Episode -------------------------------------------------"
+
+    return policy, V_trend, V_episodic_trend
+
+
+def qLearning(env, policy, epsilon, num_episodes, step_rate=0.1, discount_factor=0.9):
+    Q = dict(policy)
+    V = {}
+    V_trend = []
+    V_episodic_trend = []
+    sample_state=12
+    for key in policy:
+        Q[key] = [0] * env.actions.size
+
+    for i in range(0, num_episodes):
+        env.reset()
+        state = env.initializeState()
+
+        print ("Episode: {0}".format(i))
+        # if i > num_episodes - 50:
+        #     print "--------------------------------------Start of Episode ----------------------------------------------"
+
+        for t in range(100):
+            current_state_action = np.random.choice([k for k in range(env.actions.size)], p=policy[state])
+            # if i > num_episodes - 50:
+            #     print "--------------------------------------Step {0} ----------------------------------------------" .format(t)
+            #     print env.grid, env.actions[current_state_action]
+
+            next_state, reward, done = env.executeAction(state, current_state_action)
+            next_state_action = np.argmax(Q[next_state])
+            Q[state][current_state_action] += step_rate * (reward + (discount_factor * Q[next_state][next_state_action]) - Q[state][current_state_action])
+            if done:
+                break
+            state = next_state
+
+
+        for state, Q_values in Q.items():
+            policy[state] = (np.eye(env.actions.size)[np.argmax(Q_values)] * (1 - epsilon)) + (epsilon / env.actions.size)
+            V[state] = sum([Q_values[val] * policy[state][val] for val in range(len(Q_values))])
+
+        V_trend.append(sum(V.values()))
+
+        if i == 0:
+            V_episodic_trend.append(sum(V.values()[sample_state * 16:(sample_state * 16) + 16]))
+
+        elif (i+1) % (num_episodes/10) == 0:
+            V_episodic_trend.append(sum(V.values()[sample_state*16:(sample_state*16)+16]))
+        # if i > num_episodes - 50:
+        #     print "--------------------------------------- End of Episode -------------------------------------------------"
+
+    return policy, V_trend, V_episodic_trend

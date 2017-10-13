@@ -47,11 +47,11 @@ class gridWorld:
     def initializeState(self):
         state_to_location = np.reshape(np.arange(16), grid.shape)
         while True:
-            robot_location = np.random.choice([i for i in range(grid.size)], p=[1./env.grid.size]*env.grid.size)
+            robot_location = np.random.choice([i for i in range(grid.size)], p=[1./self.grid.size]*self.grid.size)
             # dynamic_object_location = np.random.choice([i for i in range(grid.size)], p=[1./env.grid.size]*env.grid.size)
             dynamic_object_location = 2
             state = State(robot_location, dynamic_object_location)
-            if env.validateState(state):
+            if self.validateState(state):
                 break
         for i,j in zip(*np.where(state_to_location == state.static_location)):
             initialRobotState = (i,j)
@@ -246,7 +246,7 @@ class gridWorld:
             self.grid[dynamic_location[0], dynamic_location[1]] = "^"
             done = False
 
-        env.gridGenerator()
+        self.gridGenerator()
         rewards = self.rewards.reshape(self.grid.shape[0] * self.grid.shape[1])
 
         return State(next_state,dynamic_state), rewards[next_state], done
@@ -259,14 +259,11 @@ grid = np.array([['o', 'o', 'o', '*'],
                  ['o', 'o', 'o', 'o']], dtype= 'S4')
 
 State=namedtuple("State", ["static_location", "dynamic_location"])
-policy = {}
-for i in range(grid.size):
-    for j in range(grid.size):
-        policy[State(i, j)] = [0.2, 0.2, 0.2, 0.2, 0.2]
-env = gridWorld(grid)
 
-final_policy = algorithms.monteCarloPredictor(env, policy, 0.2, 90000)
 
+
+# final_policy = algorithms.monteCarloPredictor(env, policy, 0.2, 90000)
+# final_policy = algorithms.sarsaTD(env, policy, 0.2, 100)
 
 
 

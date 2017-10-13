@@ -39,39 +39,62 @@ def plotTrend(algorithm,subplot):
 
 
 # Function to test and plot performance metrics of the desired algorithm
-def testAlgoParam():
+def testAlgoParam(env, policy, num_episodes):
 
-    num_iters = np.linspace(10000, 100000, 10)
+    num_iters = np.linspace(0, num_episodes, 11)
     epsilon = np.linspace(0.0, 1.0, 5)
 
 
-    color=['b', 'g', 'r', 'c', 'm', 'y', 'k', 'w']
+    ## Plotting performance with respect to just number of iterations
+    parameters = []
+    V_iter = []
+
+    print "Running: Performance based on No. of Episodes"
+
+    plt.figure(1)
+    _, _, V_test = algorithms.sarsaTD(env, policy, 0.1, num_episodes)
+
+    print "Performance based on No. of Episodes ---- Complete"
+    plt.title("Iteration Performance based on number of epsiodes (e = 0.2)")
+    plt.xlabel('Number of Iterations')
+    plt.ylabel('V Value')
+    plt.plot(num_iters, V_test, marker='8')
+    for i, j in zip(num_iters,V_test):
+        plt.annotate(str(j), xy=(i, j))
+
+
+    ## Plotting performance with respect to both number of iterations and epsilon
+    parameters = []
     lines = []
+    color = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'w']
     for i, eps in enumerate(epsilon):
-        parameters = []
-        V_iter = []
-        for num in num_iters:
-            parameters.append((env, policy, eps, int(num)))
+        parameters.append((env, policy, eps, num_episodes))
+        lines.append(mlines.Line2D([], [], color=color[i], marker='8', label="eps: {0}".format(eps)))
 
-        p = multiprocessing.Pool(multiprocessing.cpu_count())
-        p_iter = [p.apply_async(algorithms.monteCarloPredictor, param) for param in parameters]
-        p.close()
-        p.join()
-        for value in p_iter:
-            _, _, V_test = value.get()
-            V_iter.append(V_test)
+    print "Running : Performance based on No. of Episodes and Epsilon" .format(eps)
+    p = multiprocessing.Pool(multiprocessing.cpu_count())
+    p_iter = [p.apply_async(algorithms.sarsaTD, param) for param in parameters]
+    p.close()
+    p.join()
 
-        plt.figure(1)
-        plt.subplot(121).set_title("Iteration Performance (e = 0.1)")
-        plt.xlabel('Number of Iterations')
-        plt.ylabel('V Value')
-        lines.append(mlines.Line2D([], [], color=color[i], marker='8', label="eps: {0}" .format(eps)))
+    print "Performance based on No. of Episodes and Epsilon ---- Complete"
+    plt.figure(2)
+    plt.title("Iteration Performance based on exploration and number of episodes")
+    plt.xlabel('Number of Iterations')
+    plt.ylabel('V Value')
 
-        plt.plot(num_iters, V_iter, color[i])
+    for i, value in enumerate(p_iter):
+
+        _, _, V_test = value.get()
+
+        plt.plot(num_iters, V_test, color[i], marker='8')
+
+        for i, j in zip(num_iters, V_test):
+            plt.annotate(str(j), xy=(i, j))
 
     plt.legend(handles=lines)
-    plt.show()
 
+    plt.show()
 
 
 grid = np.array([['o', 'o', 'o', '*'],
@@ -84,6 +107,8 @@ policy = {}
 for i in range(grid.size):
     for j in range(grid.size):
         policy[State(i, j)] = [0.2, 0.2, 0.2, 0.2, 0.2]
+
 env = gridWorldExampleDynamic.gridWorld(grid)
 
-testAlgoParam()
+# algorithms.qLearning(env, policy, 0.2, 10000)
+testAlgoParam(env, policy, 100000)
