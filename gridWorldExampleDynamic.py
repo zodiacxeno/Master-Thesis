@@ -3,7 +3,7 @@ import copy
 from collections import namedtuple
 import algorithms
 class gridWorld:
-
+    State = namedtuple("State", ["static_location", "dynamic_location"])
     def __init__(self, grid):
         self.grid = copy.deepcopy(grid)
         self.actions = np.array(['up', 'down', 'left', 'right', 'wait'])
@@ -24,6 +24,7 @@ class gridWorld:
         self.rewards[self.grid == "*"] = 0
         self.rewards[self.grid == "o"] = -1
         self.rewards[self.grid == "^"] = -10
+        self.rewards[self.grid == "r"] = -1
         self.rewards[self.grid == "r#"] = -80
         self.rewards[self.grid == "r^"] = -80
         self.rewards[self.grid == "r*"] = 0
@@ -36,6 +37,7 @@ class gridWorld:
         goal=[]
         for obstacles_x, obstacles_y in zip(*np.where(self.grid == "#")):
             obstacles.append(self.grid.shape[1]*obstacles_x+obstacles_y)
+
         for goal_x, goal_y in zip(*np.where(self.grid == "*")):
             goal.append(self.grid.shape[1]*goal_x+goal_y)
         if state.static_location in obstacles or state.dynamic_location in obstacles or state.static_location==state.dynamic_location or state.static_location in goal or state.dynamic_location in goal:
@@ -44,15 +46,19 @@ class gridWorld:
         else:
             return True
 
-    def initializeState(self):
+    def initializeState(self, initial_state=State(0,0)):
+
         state_to_location = np.reshape(np.arange(16), grid.shape)
-        while True:
-            robot_location = np.random.choice([i for i in range(grid.size)], p=[1./self.grid.size]*self.grid.size)
-            # dynamic_object_location = np.random.choice([i for i in range(grid.size)], p=[1./env.grid.size]*env.grid.size)
-            dynamic_object_location = 2
-            state = State(robot_location, dynamic_object_location)
-            if self.validateState(state):
-                break
+        if initial_state != State(0,0):
+            state = initial_state
+        else:
+            while True:
+                robot_location = np.random.choice([i for i in range(grid.size)], p=[1./self.grid.size]*self.grid.size)
+                # dynamic_object_location = np.random.choice([i for i in range(grid.size)], p=[1./env.grid.size]*env.grid.size)
+                dynamic_object_location = 2
+                state = State(robot_location, dynamic_object_location)
+                if self.validateState(state):
+                    break
         for i,j in zip(*np.where(state_to_location == state.static_location)):
             initialRobotState = (i,j)
 
@@ -72,6 +78,10 @@ class gridWorld:
                 (locations_x, locations_y)=(i,j)
             obstacles_x, obstacles_y = np.where(self.grid == "#")
             obstacles = zip(obstacles_x, obstacles_y)
+            if "r#" in self.grid:
+                obstacles += (zip(*np.where(self.grid == "r#")))
+
+
             action_possibilities = []
             if locations_x > 0 and locations_x != self.grid.shape[0] - 1:
                 if (locations_x + 1, locations_y) in obstacles and (locations_x - 1, locations_y) in obstacles:
@@ -260,11 +270,16 @@ grid = np.array([['o', 'o', 'o', '*'],
 
 State=namedtuple("State", ["static_location", "dynamic_location"])
 
-
+# policy = {}
+# for i in range(grid.size):
+#     for j in range(grid.size):
+#         policy[State(i, j)] = [0.2, 0.2, 0.2, 0.2, 0.2]
+#
+# env = gridWorld(grid)
 
 # final_policy = algorithms.monteCarloPredictor(env, policy, 0.2, 90000)
 # final_policy = algorithms.sarsaTD(env, policy, 0.2, 100)
-
+# final_policy = algorithms.nStepSarsa(env, policy, 0.2, 10000, 2)
 
 
 
