@@ -41,7 +41,7 @@ def plotTrend(algorithm,subplot):
 
 # Function to test and plot performance metrics of the desired algorithm
 def testAlgoParam(env, policy, num_episodes):
-    np.random.seed(23)
+    np.random.seed(3)
     num_iters = np.linspace(10, num_episodes, 10)
     epsilon = np.linspace(0.0, 1.0, 5)
 
@@ -127,18 +127,21 @@ def testAlgoParam(env, policy, num_episodes):
 
     plt.show()
 
-
-grid = np.array([['o', 'o', 'o', '*'],
-                 ['#', '#', 'o', '#'],
-                 ['o', 'o', 'o', 'o'],
-                 ['o', 'o', 'o', 'o']], dtype= 'S4')
+grid = np.array([['o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', '*'],
+                 ['o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o'],
+                 ['#', '#', 'o', '#', '#', '#', '#', 'o', '#'],
+                 ['#', '#', 'o', '#', '#', '#', '#', 'o', '#'],
+                 ['#', '#', 'o', '#', '#', '#', '#', 'o', '#'],
+                 ['o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o'],
+                 ['o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o'],
+                 ['o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o']], dtype= 'S4')
 
 State=namedtuple("State", ["static_location", "dynamic_location"])
 policy = {}
 for i in range(grid.size):
     for j in range(grid.size):
-        policy[State(i, j)] = [0.2, 0.2, 0.2, 0.2, 0.2]
-
+        policy[State(i, j)] = [0.5, 0.5] # Controller Mode
+        # policy[State(i, j)] = [0.2, 0.2, 0.2, 0.2, 0.2] # Normal Mode
 env = gridWorldExampleDynamic.gridWorld(grid)
 
 # algorithms.qLearning(env, policy, 0.2, 10000)

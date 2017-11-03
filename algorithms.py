@@ -118,9 +118,9 @@ def sarsaTD(env, policy, epsilon, num_episodes, step_rate=0.1, discount_factor=1
             print "--------------------------------------Start of Episode ----------------------------------------------"
         current_state_action = np.random.choice([k for k in range(env.actions.size)], p=policy[state])
         for t in range(100):
-            if i > num_episodes - 50:
-                print "--------------------------------------Step {0} ----------------------------------------------" .format(t)
-                print env.grid, env.actions[current_state_action]
+            # if i > num_episodes - 50:
+            print "--------------------------------------Step {0} ----------------------------------------------" .format(t)
+            print env.grid, env.actions[current_state_action]
 
             next_state, reward, done = env.executeAction(state, current_state_action)
             epsilon_greedy_prob = (np.eye(env.actions.size)[np.argmax(Q[next_state])] * (1 - epsilon)) + (epsilon / env.actions.size)
@@ -253,7 +253,7 @@ def nStepSarsa(env, policy, epsilon, num_episodes, step_count, step_rate=0.1, di
             state_return = 0
             # for j in range(16):
             env.reset()
-            test_state = env.initializeState(State(12,0))
+            test_state = env.initializeState(State(63,0))
 
             for test_count in range(0,350):
                 epsilon_greedy_prob = np.eye(env.actions.size)[np.argmax(Q[test_state])]

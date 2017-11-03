@@ -2,15 +2,21 @@ import numpy as np
 import copy
 from collections import namedtuple
 import algorithms
+import dijkstra
+
 class gridWorld:
     State = namedtuple("State", ["static_location", "dynamic_location"])
     def __init__(self, grid):
+
         self.grid = copy.deepcopy(grid)
-        self.actions = np.array(['up', 'down', 'left', 'right', 'wait'])
+        # self.actions = np.array(['up', 'down', 'left', 'right', 'wait'])  # Normal Mode
+        self.actions = np.array(['proceed_to_wait', 'proceed_to_goal'])     # Controller Mode
         self.states = np.array(range(0, self.grid.shape[0] * self.grid.shape[1]))
         self.rewards = np.zeros(self.grid.shape)
+        self.goal_location = [(0, self.grid.shape[1]-1)]
+        self.wait_locations = [(5,1), (5,3)]
 
-
+    # (5, 6), (5, 8)
     def reset(self):
         self.previous_grid_state_robot = "o"
         self.previous_grid_state_dynobj = "o"
@@ -48,7 +54,7 @@ class gridWorld:
 
     def initializeState(self, initial_state=State(0,0)):
 
-        state_to_location = np.reshape(np.arange(16), grid.shape)
+        state_to_location = np.reshape(np.arange(self.grid.size), self.grid.shape)
         if initial_state != State(0,0):
             state = initial_state
         else:
@@ -70,12 +76,12 @@ class gridWorld:
         return state
 
     def dynamicObjectGenerator(self, dynamic_location):
-        state_to_location = np.reshape(np.arange(16), grid.shape)
-        if dynamic_location == 14:
+        state_to_location = np.reshape(np.arange(self.grid.size), self.grid.shape)
+        if dynamic_location == 70:
             next_location = (0, 0)
         else:
             for i, j in zip(*np.where(state_to_location == dynamic_location)):
-                (locations_x, locations_y)=(i,j)
+                (locations_x, locations_y) = (i,j)
             obstacles_x, obstacles_y = np.where(self.grid == "#")
             obstacles = zip(obstacles_x, obstacles_y)
             if "r#" in self.grid:
@@ -172,7 +178,7 @@ class gridWorld:
 
     def executeAction(self, state, action):
         max_action_prob = 1.0
-        state_to_location = np.reshape(np.arange(16), grid.shape)
+        state_to_location = np.reshape(np.arange(self.grid.size), self.grid.shape)
 
 
         for i, j in zip(*np.where(state_to_location == state.static_location)):
@@ -181,33 +187,55 @@ class gridWorld:
             self.previous_grid_location_dynobj = [i, j]
 
         for i,j in zip(*np.where(state_to_location == state.static_location)):
-            current_location = [i,j]
+            current_location = (i,j)
 
 
-        if action == 2:
-            if current_location[1] > 0:
-                next_state = np.random.choice([state.static_location - 1, state.static_location], p=[max_action_prob, 1.-max_action_prob])
+
+
+        ## Normal Mode
+        # if action == 2:
+        #     if current_location[1] > 0:
+        #         next_state = np.random.choice([state.static_location - 1, state.static_location], p=[max_action_prob, 1.-max_action_prob])
+        #     else:
+        #         next_state = state.static_location
+        # elif action == 3:
+        #     if current_location[1] == 0 or (current_location[1] > 0 and current_location[1] != self.grid.shape[1] - 1):
+        #         next_state = np.random.choice([state.static_location + 1, state.static_location], p=[max_action_prob, 1.-max_action_prob])
+        #     else:
+        #         next_state = state.static_location
+        # elif action == 0:
+        #     if current_location[0] > 0:
+        #         next_state = np.random.choice([state.static_location - self.grid.shape[1], state.static_location], p=[max_action_prob, 1.-max_action_prob])
+        #     else:
+        #         next_state = state.static_location
+        # elif action == 1:
+        #     if current_location[0] == 0 or (current_location[0] > 0 and current_location[0] != self.grid.shape[0] - 1):
+        #         next_state = np.random.choice([state.static_location + self.grid.shape[1], state.static_location], p=[max_action_prob, 1.-max_action_prob])
+        #     else:
+        #         next_state = state.static_location
+        # elif action == 4:
+        #     next_state = state.static_location
+        # else:
+        #     next_state = state.static_location
+
+
+        ## Controller Mode
+        if action == 0:
+            if current_location not in self.wait_locations:
+                path = dijkstra.computeShortestPath(self.grid, current_location, self.wait_locations)
+                next_static_location = path[1][0] * self.grid.shape[1] + path[1][1]
             else:
-                next_state = state.static_location
-        elif action == 3:
-            if current_location[1] == 0 or (current_location[1] > 0 and current_location[1] != self.grid.shape[1] - 1):
-                next_state = np.random.choice([state.static_location + 1, state.static_location], p=[max_action_prob, 1.-max_action_prob])
-            else:
-                next_state = state.static_location
-        elif action == 0:
-            if current_location[0] > 0:
-                next_state = np.random.choice([state.static_location - self.grid.shape[1], state.static_location], p=[max_action_prob, 1.-max_action_prob])
-            else:
-                next_state = state.static_location
+                next_static_location = current_location[0] * self.grid.shape[1] + current_location[1]
+
         elif action == 1:
-            if current_location[0] == 0 or (current_location[0] > 0 and current_location[0] != self.grid.shape[0] - 1):
-                next_state = np.random.choice([state.static_location + self.grid.shape[1], state.static_location], p=[max_action_prob, 1.-max_action_prob])
+            if current_location not in self.goal_location:
+                path = dijkstra.computeShortestPath(self.grid, current_location, self.goal_location)
+                next_static_location = path[1][0] * self.grid.shape[1] + path[1][1]
             else:
-                next_state = state.static_location
-        elif action == 4:
-            next_state = state.static_location
-        else:
-            next_state = state.static_location
+                next_static_location = current_location[0] * self.grid.shape[1] + current_location[1]
+
+        next_state = np.random.choice([next_static_location, state.static_location],
+                                      p=[max_action_prob, 1. - max_action_prob])
 
 
         dynamic_location, dynamic_state = self.dynamicObjectGenerator(state.dynamic_location)
@@ -263,13 +291,17 @@ class gridWorld:
 
 
 
-grid = np.array([['o', 'o', 'o', '*'],
-                 ['#', '#', 'o', '#'],
-                 ['o', 'o', 'o', 'o'],
-                 ['o', 'o', 'o', 'o']], dtype= 'S4')
+grid = np.array([['o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', '*'],
+                 ['o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o'],
+                 ['#', '#', 'o', '#', '#', '#', '#', '#', '#'],
+                 ['#', '#', 'o', '#', '#', '#', '#', '#', '#'],
+                 ['#', '#', 'o', '#', '#', '#', '#', '#', '#'],
+                 ['o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o'],
+                 ['o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o'],
+                 ['o', 'o', 'o', 'o', 'o', 'o', 'o', 'o', 'o']], dtype= 'S4')
 
-State=namedtuple("State", ["static_location", "dynamic_location"])
 
+State = namedtuple("State", ["static_location", "dynamic_location"])
 # policy = {}
 # for i in range(grid.size):
 #     for j in range(grid.size):
