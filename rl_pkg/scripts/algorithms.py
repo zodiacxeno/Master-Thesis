@@ -211,7 +211,7 @@ def nStepSarsa(env, policy, epsilon, num_episodes, step_count, step_rate=0.1, di
 
     for i in range(0, num_episodes):
         #env.reset()
-        state = env.initializeState()
+        state = env.initializeState(State(80,19))
         T = 100
         episode = []
         print ("Episode: {0}".format(i))
@@ -225,10 +225,11 @@ def nStepSarsa(env, policy, epsilon, num_episodes, step_count, step_rate=0.1, di
         for t in range(0, T):
             print "--------------------------------------Step {0} ----------------------------------------------".format(
                 t)
-            print state, env.actions[current_state_action]
+
 
             if t < T:
                 next_state, reward, done = env.executeAction(state, current_state_action)
+                print state, env.actions[current_state_action], reward
                 if done:
                     T = t+1
                 else:
@@ -251,21 +252,27 @@ def nStepSarsa(env, policy, epsilon, num_episodes, step_count, step_rate=0.1, di
                 Q[Q_index[0]][Q_index[1]] += step_rate*(G - Q[Q_index[0]][Q_index[1]])
 
 
-        # if (i+1) % (num_episodes/10) == 0:
-        #     state_return = 0
-        #     # for j in range(16):
-        #     env.reset()
-        #     test_state = env.initializeState(State(63,0))
-        #
-        #     for test_count in range(0,350):
-        #         epsilon_greedy_prob = np.eye(env.actions.size)[np.argmax(Q[test_state])]
-        #         current_test_action = np.random.choice([k for k in range(env.actions.size)], p=epsilon_greedy_prob)
-        #         next_test_state, reward, test_done = env.executeAction(test_state, current_test_action)
-        #         state_return += reward
-        #         if test_done:
-        #             break
-        #         test_state = next_test_state
-        #     V_episodic_trend.append(state_return)
+        if (i+1) % (num_episodes/10) == 0:
+            print "Testing"
+            V_return = []
+            for sample_iters in range(10):
+                state_return = 0
+                # for j in range(16):
+
+                test_state = env.initializeState(State(80,19))
+
+                for test_count in range(0,100):
+                    epsilon_greedy_prob = np.eye(env.actions.size)[np.argmax(Q[test_state])]
+                    current_test_action = np.random.choice([k for k in range(env.actions.size)], p=epsilon_greedy_prob)
+                    next_test_state, reward, test_done = env.executeAction(test_state, current_test_action)
+                    state_return += reward
+                    if test_done:
+                        break
+                    test_state = next_test_state
+
+                V_return.append(state_return)
+
+            V_episodic_trend.append((np.mean(V_return),np.std(V_return)))
 
         for state, Q_values in Q.items():
             V[state] = sum([Q_values[val] * policy[state][val] for val in range(len(Q_values))])
@@ -281,4 +288,4 @@ def nStepSarsa(env, policy, epsilon, num_episodes, step_count, step_rate=0.1, di
     for state, Q_values in Q.items():
         policy[state] = (np.eye(env.actions.size)[np.argmax(Q_values)] * (1 - epsilon)) + (epsilon / env.actions.size)
 
-    return policy, V
+    return policy, V, V_episodic_trend

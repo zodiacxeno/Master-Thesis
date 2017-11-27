@@ -3,9 +3,9 @@ import copy
 import numpy as np
 import rospy
 from nav_msgs.msg import OccupancyGrid
-from geometry_msgs.msg  import PoseWithCovarianceStamped, Pose
-from move_base_msgs.msg import MoveBaseActionGoal
+from geometry_msgs.msg import PoseWithCovarianceStamped, Pose, PoseStamped
 from std_srvs.srv import Empty
+from actionlib_msgs.msg import GoalStatusArray
 from stage_ros.srv import SetGlobalPose
 import tf
 import math
@@ -21,7 +21,7 @@ class gridWorld:
         self.actions = np.array(['proceed_to_wait', 'proceed_to_goal'])     # Controller Mode
         self.states = np.array(range(0, self.grid.size))
         self.rewards = np.zeros(self.grid.shape)
-        self.goal_location = [(1,12)]
+        self.goal_location = [(1,11)]
         self.wait_locations = [(4,8)]
         self.obstacles = []
         self.initial_pose = rospy.ServiceProxy('/global_pose', SetGlobalPose)
@@ -34,6 +34,7 @@ class gridWorld:
         self.listener = tf.TransformListener()
         self.previous_action = None
         self.previous_robot_pose = None
+        self.pub = rospy.Publisher('/robot_1/move_base_simple/goal', PoseStamped, queue_size=10)
 
 
     def computeShortestPath(self, start, goals):
@@ -115,11 +116,10 @@ class gridWorld:
 
 
         for index, value in enumerate(occupancy_info):
-            if index > 195840 and index < 195900:
-                print value
+
             if value != 0:
                 pixel_row = (index / width)
-                row_index = int(pixel_row / grid_resolution[0])
+                row_index = self.grid.shape[0] - int(pixel_row / grid_resolution[0]) - 1
                 pixel_column = index % width
                 column_index = int(pixel_column / grid_resolution[1])
 
@@ -158,10 +158,10 @@ class gridWorld:
 
 
     def initializeState(self, state=None):
-        # pose_pub = rospy.Publisher('/robot_1/initialpose', PoseWithCovarianceStamped, queue_size=5)
+
 
         self.rewards[:] = -1
-        self.rewards[zip(*self.obstacles)] = -80
+
         self.rewards[zip(*self.goal_location)] = 10
 
         state_to_location = np.reshape(np.arange(self.grid.size), self.grid.shape)
@@ -176,8 +176,6 @@ class gridWorld:
 
 
 
-        # x_initial = max([(initialRobotState[1]+1)*(12.8 / self.grid.shape[1]), 1.0])
-        # y_initial = max([((self.grid.shape[0] - 1) - initialRobotState[0]) * (8. / self.grid.shape[0]), 1.0])
 
         robot_x_initial = (12.8 / self.grid.shape[1]) * (initialRobotState[1] + 0.5)
         robot_y_initial = (8. / self.grid.shape[0]) * (self.grid.shape[0] - initialRobotState[0] - 0.5)
@@ -242,15 +240,15 @@ class gridWorld:
         #time.sleep(1)
 
         self.step()
-        self.clear_costmaps()
+
 
         state, robot_location, dynamic_object_location = self.location_to_state(robot_initial_pose_msg.position.x, robot_initial_pose_msg.position.y, dynamic_initial_pose_msg.position.x, dynamic_initial_pose_msg.position.y)
         print robot_location, dynamic_object_location
         return state
 
     def executeAction(self, state, action):
-        self.clear_costmaps()
-        self.step()
+
+
         state_to_location = np.reshape(np.arange(self.grid.size), self.grid.shape)
         for i,j in zip(*np.where(state_to_location == state.static_location)):
             current_location = (i,j)
@@ -261,23 +259,23 @@ class gridWorld:
                 nearest_wait_location = self.wait_locations
                 wait_x = (12.8 / self.grid.shape[1]) * (nearest_wait_location[0][1] + 0.5)
                 wait_y = (8. / self.grid.shape[0]) * (self.grid.shape[0] - nearest_wait_location[0][0] - 0.5)
-                pub = rospy.Publisher('/robot_1/move_base/goal', MoveBaseActionGoal, queue_size=10)
+
 
                 q = tf.transformations.quaternion_from_euler(0, 0, 0)
-                goal = MoveBaseActionGoal()
-                goal.goal.target_pose.header.frame_id = "map"
-                goal.goal.target_pose.pose.position.x = wait_x
-                goal.goal.target_pose.pose.position.y = wait_y
-                goal.goal.target_pose.pose.position.z = 0.02
+                goal = PoseStamped()
+                goal.header.frame_id = "map"
+                goal.pose.position.x = wait_x
+                goal.pose.position.y = wait_y
+                goal.pose.position.z = 0.02
 
-                goal.goal.target_pose.pose.orientation.x = q[0]
-                goal.goal.target_pose.pose.orientation.y = q[1]
-                goal.goal.target_pose.pose.orientation.z = q[2]
-                goal.goal.target_pose.pose.orientation.w = q[3]
+                goal.pose.orientation.x = q[0]
+                goal.pose.orientation.y = q[1]
+                goal.pose.orientation.z = q[2]
+                goal.pose.orientation.w = q[3]
 
-                pub.publish(goal)
+                self.pub.publish(goal)
 
-                self.step()
+
 
             if current_location not in self.wait_locations:
                 self.step()
@@ -285,47 +283,49 @@ class gridWorld:
                 next_state, next_robot_location, next_dynamic_location = self.location_to_state(robot_trans[0], robot_trans[1], dyn_trans[0], dyn_trans[1])
 
             else:
+                self.step()
                 (robot_trans, robot_rot) = self.listener.lookupTransform("map", "robot_1/base_link", rospy.Time(0))
                 next_state, next_robot_location, next_dynamic_location = self.location_to_state(robot_trans[0], robot_trans[1], dyn_trans[0], dyn_trans[1])
 
 
         elif action == 1:
             if self.previous_action != action:
-                pub = rospy.Publisher('/robot_1/move_base/goal', MoveBaseActionGoal, queue_size=10)
 
                 q = tf.transformations.quaternion_from_euler(0, 0, 0)
-                goal = MoveBaseActionGoal()
-                goal.goal.target_pose.header.frame_id = "map"
+                goal = PoseStamped()
+                goal.header.frame_id = "map"
 
-                goal.goal.target_pose.pose.position.x = 11.0
-                goal.goal.target_pose.pose.position.y = 6.66
-                goal.goal.target_pose.pose.position.z = 0.02
+                goal.pose.position.x = 11.0
+                goal.pose.position.y = 6.66
+                goal.pose.position.z = 0.02
 
-                goal.goal.target_pose.pose.orientation.x = q[0]
-                goal.goal.target_pose.pose.orientation.y = q[1]
-                goal.goal.target_pose.pose.orientation.z = q[2]
-                goal.goal.target_pose.pose.orientation.w = q[3]
+                goal.pose.orientation.x = q[0]
+                goal.pose.orientation.y = q[1]
+                goal.pose.orientation.z = q[2]
+                goal.pose.orientation.w = q[3]
 
-                pub.publish(goal)
-                self.step()
+                self.pub.publish(goal)
+
             if current_location not in self.goal_location:
                 self.step()
                 (robot_trans, robot_rot) = self.listener.lookupTransform("map", "robot_1/base_link", rospy.Time(0))
                 next_state, next_robot_location, next_dynamic_location = self.location_to_state(robot_trans[0], robot_trans[1], dyn_trans[0], dyn_trans[1])
 
             else:
+                self.step()
                 (robot_trans, robot_rot) = self.listener.lookupTransform("map", "robot_1/base_link", rospy.Time(0))
                 next_state, next_robot_location, next_dynamic_location = self.location_to_state(robot_trans[0], robot_trans[1], dyn_trans[0], dyn_trans[1])
 
 
         self.previous_action = action
 
-        if next_robot_location in self.goal_location or self.previous_robot_pose == (robot_trans, robot_rot) and next_robot_location not in self.wait_locations:
+        if next_robot_location in self.goal_location and next_robot_location not in self.wait_locations: #self.previous_robot_pose == (robot_trans, robot_rot)
             done = True
         else:
             done = False
+        connected_states = [next_state.static_location + 1, next_state.static_location - 1, next_state.static_location - self.grid.shape[1], next_state.static_location + self.grid.shape[1]]
+        if next_state.static_location == next_state.dynamic_location or next_state.dynamic_location in connected_states:
 
-        if next_state.static_location == next_state.dynamic_location:
             reward = -80
         else:
             rewards = self.rewards.reshape(self.grid.size)

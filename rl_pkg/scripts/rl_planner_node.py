@@ -10,6 +10,8 @@ import gridEnv
 from collections import namedtuple
 import numpy as np
 import time
+import matplotlib.pyplot as plt
+import matplotlib.lines as mlines
 # def goalPublisher(x,y,z):
 #     pub = rospy.Publisher('/robot_1/move_base/goal', MoveBaseActionGoal, queue_size=10)
 #     rospy.init_node('goalPublisher',anonymous=True)
@@ -56,22 +58,65 @@ def planner(env,policy):
 
 if __name__ == '__main__':
     rospy.init_node('rl_planner', anonymous=True)
-
+    policy = {}
     grid = np.empty(shape=(8,13))
     env = gridEnv.gridWorld(grid)
+    num_episodes = 1000
+    intervals = 10
+    num_iters = np.linspace(0, num_episodes-1, intervals)
+    lines = []
+    color = ['C0', 'C1']
 
 
-    policy = {}
+
+
+    for i in range(grid.size):
+        for j in range(grid.size):
+            policy[State(i, j)] = [0.0, 1.0]
+
+    V_baseline = []
+    for i in range(intervals):
+
+        test_state = env.initializeState(State(79, 23))
+        state_return = 0
+        for test_count in range(0, 100):
+
+            current_test_action = np.argmax(policy[test_state])
+            next_test_state, reward, test_done = env.executeAction(test_state, current_test_action)
+            state_return += reward
+            if test_done:
+                break
+            test_state = next_test_state
+        V_baseline.append(state_return)
+
+    lines.append(mlines.Line2D([], [], color='r', marker='8', label='Worst-case Baseline Performance'))
+    lines.append(mlines.Line2D([], [], color='b', marker='8', label='Learning Performance'))
+    plt.title("Iteration Performance based on number of epsiodes (e = 0.2)")
+    plt.xlabel('Number of Iterations')
+    plt.ylabel('V Value')
+
+    plt.errorbar(num_iters, [np.mean(V_baseline)]*intervals, [np.std(V_baseline)]*intervals, linestyle='solid', color='r', label='Worst-case Baseline Performance')
+
+
+
     for i in range(grid.size):
         for j in range(grid.size):
             policy[State(i, j)] = [0.5, 0.5]
 
-    p,v=algorithms.nStepSarsa(env, policy, 0.1, 500, 5)
+    p, v, v_trend=algorithms.nStepSarsa(env, policy, 0.1, num_episodes, 5)
+    v_trend_mean = zip(*v_trend)[0]
+    v_trend_std = zip(*v_trend)[1]
+
+    plt.errorbar(num_iters, v_trend_mean, v_trend_std, linestyle='solid', color='b', marker='8', label='Learning Performance')
+    for i, j in zip(num_iters, v_trend_mean):
+        plt.annotate(str(j), xy=(i, j))
+    plt.legend()
+    plt.show()
     print p,v
     #
     # while True:
     #     robot_state = input('Enter start location')
-    #     dynamic_object_state = 8
+    #     dynamic_object_state = 19
     #     state = State(robot_state, dynamic_object_state)
     #     env.initializeState(state)
     #
